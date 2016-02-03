@@ -22,22 +22,22 @@ object MapInterpreter {
   private def applyQueryLog(w: TasksMap): Prod[CotaskQuery, Colog, TasksMap] =
     Prod(CotaskQuery(findTaskH(w), findAllH(w), findOpenH(w), findCompleteH(w)), Colog(infoH(w), warnH(w)))
 
-  def commitH(ts: TasksMap)(id: String, text: String): TasksMap = (ts._1 + (id -> Task(id, text, "open")), ts._2)
+  private def commitH(ts: TasksMap)(id: String, text: String): TasksMap = (ts._1 + (id -> Task(id, text, "open")), ts._2)
 
-  def completeH(ts: TasksMap)(id: String): TasksMap =
+  private def completeH(ts: TasksMap)(id: String): TasksMap =
     (ts._1.get(id).fold(ts._1)(t => ts._1 + (id -> Task(t.id, t.text, "closed"))), ts._2)
 
-  def findTaskH(ts: TasksMap)(id: String): (Option[Task], TasksMap) = (ts._1.get(id), ts)
+  private def findTaskH(ts: TasksMap)(id: String): (Option[Task], TasksMap) = (ts._1.get(id), ts)
 
-  def findAllH(ts: TasksMap)(): (List[Task], TasksMap) = (ts._1.toList.map({ case (k, v) => v }), ts)
+  private def findAllH(ts: TasksMap)(): (List[Task], TasksMap) = (ts._1.toList.map({ case (k, v) => v }), ts)
 
-  def findOpenH(ts: TasksMap)(): (List[Task], TasksMap) =
+  private def findOpenH(ts: TasksMap)(): (List[Task], TasksMap) =
     (ts._1.toList.map({ case (k, v) => v }).filter(t => t.status == "open"), ts)
 
-  def findCompleteH(ts: TasksMap)(): (List[Task], TasksMap) =
+  private def findCompleteH(ts: TasksMap)(): (List[Task], TasksMap) =
     (ts._1.toList.map({ case (k, v) => v }).filter(t => t.status == "closed"), ts)
 
-  def infoH(ts: TasksMap)(msg: String): TasksMap = (ts._1, ts._2 :+ s"[INFO] $msg")
+  private def infoH(ts: TasksMap)(msg: String): TasksMap = (ts._1, ts._2 :+ s"[INFO] $msg")
 
-  def warnH(ts: TasksMap)(msg: String): TasksMap = (ts._1, ts._2 :+ s"[WARN] $msg")
+  private def warnH(ts: TasksMap)(msg: String): TasksMap = (ts._1, ts._2 :+ s"[WARN] $msg")
 }
