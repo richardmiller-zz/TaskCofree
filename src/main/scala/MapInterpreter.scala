@@ -5,6 +5,10 @@ import Cologs._
 import CotaskQueries._
 import CotaskCommands._
 import cats.data.Prod
+import monocle.Iso
+import monocle.function._
+import monocle.std._
+import monocle.macros.GenLens
 import scala.language.higherKinds
 
 object MapInterpreter {
@@ -13,31 +17,45 @@ object MapInterpreter {
   type CoqueryOrLog[A] = Prod[CotaskQuery, Colog, A]
   type Cocombined[A] = Prod[CotaskCommand, CoqueryOrLog, A]
 
-  def mkCotaskQueryLog(ts: TasksMap): Cofree[Cocombined, TasksMap] =
-    unfold[TasksMap, Cocombined](ts)((w: TasksMap) => applyCommandQueryLog(w))
+  def mkCotaskQueryLog(ts: TasksMap): Cofree[Cocombined, TasksMap] = unfold[TasksMap, Cocombined](ts)(applyCQL)
 
-  private def applyCommandQueryLog(w: TasksMap): Prod[CotaskCommand, CoqueryOrLog, TasksMap] =
-    Prod[CotaskCommand, CoqueryOrLog, TasksMap](CotaskCommand(commitH(w), completeH(w)), applyQueryLog(w))
+  private def applyCQL(w: TasksMap): Prod[CotaskCommand, CoqueryOrLog, TasksMap] =
+    Prod[CotaskCommand, CoqueryOrLog, TasksMap](CotaskCommand(commitH(w), completeH(w)), applyQL(w))
 
-  private def applyQueryLog(w: TasksMap): Prod[CotaskQuery, Colog, TasksMap] =
+  private def applyQL(w: TasksMap): Prod[CotaskQuery, Colog, TasksMap] =
     Prod(CotaskQuery(findTaskH(w), findAllH(w), findOpenH(w), findCompleteH(w)), Colog(infoH(w), warnH(w)))
 
-  private def commitH(ts: TasksMap)(id: String, text: String): TasksMap = (ts._1 + (id -> Task(id, text, "open")), ts._2)
+  private def commitH(ts: TasksMap)(id: String, text: String): TasksMap =
+    (taskWithId(id) set Some(Task(id, text, "open")))(ts)
 
   private def completeH(ts: TasksMap)(id: String): TasksMap =
-    (ts._1.get(id).fold(ts._1)(t => ts._1 + (id -> Task(t.id, t.text, "closed"))), ts._2)
+    (taskWithId(id) composePrism some composeLens status set "completed")(ts)
 
-  private def findTaskH(ts: TasksMap)(id: String): (Option[Task], TasksMap) = (ts._1.get(id), ts)
+  private def findTaskH(ts: TasksMap)(id: String): (Option[Task], TasksMap) =
+    (taskWithId(id).get(ts), ts)
 
-  private def findAllH(ts: TasksMap)(): (List[Task], TasksMap) = (ts._1.toList.map({ case (k, v) => v }), ts)
+  private def findAllH: TasksMap => () => (List[Task], TasksMap) = tasksAndList(_ => true)
 
-  private def findOpenH(ts: TasksMap)(): (List[Task], TasksMap) =
-    (ts._1.toList.map({ case (k, v) => v }).filter(t => t.status == "open"), ts)
+  private def findOpenH: TasksMap => () => (List[Task], TasksMap) = tasksAndList(_.status == "open")
 
-  private def findCompleteH(ts: TasksMap)(): (List[Task], TasksMap) =
-    (ts._1.toList.map({ case (k, v) => v }).filter(t => t.status == "closed"), ts)
+  private def findCompleteH: TasksMap => () => (List[Task], TasksMap) = tasksAndList(_.status == "completed")
 
-  private def infoH(ts: TasksMap)(msg: String): TasksMap = (ts._1, ts._2 :+ s"[INFO] $msg")
+  private def infoH: (TasksMap => String => TasksMap) = logMsg("INFO")
 
-  private def warnH(ts: TasksMap)(msg: String): TasksMap = (ts._1, ts._2 :+ s"[WARN] $msg")
+  private def warnH: (TasksMap => String => TasksMap) = logMsg("WARN")
+
+  private val root = Iso.id[TasksMap]
+  private val tasks = root composeLens first
+  private val log = root composeLens second
+  private val status = GenLens[Task](_.status)
+
+  private def taskWithId(id: String) = tasks composeLens at(id)
+
+  private def tasksAsList(ts: TasksMap, filter: (Task) => Boolean): List[Task] =
+    (tasks composeTraversal each).getAll(ts).filter(filter)
+
+  private def tasksAndList(filter: (Task) => Boolean)(ts: TasksMap)(): (List[Task], TasksMap) = (tasksAsList(ts, filter), ts)
+
+  private def logMsg(tag: String)(ts: TasksMap)(msg: String): TasksMap =
+    (log modify ((l: List[String]) => l :+ s"[$tag] $msg"))(ts)
 }
