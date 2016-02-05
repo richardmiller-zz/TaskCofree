@@ -5,7 +5,7 @@ import cats.free._
 import Zap.Zap
 import scala.language.higherKinds
 
-sealed trait Log[+A]
+sealed trait Log[A]
 final case class Info[A](message: String, next: A) extends Log[A]
 final case class Warn[A](message: String, next: A) extends Log[A]
 
@@ -17,7 +17,7 @@ class Logs[F[_]](implicit I: Log :<: F) {
 object Logs {
   implicit def instance[F[_]](implicit I: Inject[Log,F]): Logs[F] = new Logs[F]
 
-  implicit def logF[A]: Functor[Log] = new Functor[Log] {
+  implicit def logF: Functor[Log] = new Functor[Log] {
     override def map[A, B](fa: Log[A])(f: (A) => B): Log[B] = fa match {
       case Info(msg, next) => Info(msg, f(next))
       case Warn(msg, next) => Warn(msg, f(next))
@@ -26,7 +26,7 @@ object Logs {
 }
 
 object Cologs {
-  final case class Colog[+A](infoH: (String) => A, warnH: (String) => A)
+  final case class Colog[A](infoH: (String) => A, warnH: (String) => A)
 
   implicit def CoLogF: Functor[Colog] = new Functor[Colog] {
     override def map[A, B](fa: Colog[A])(f: (A) => B): Colog[B] =

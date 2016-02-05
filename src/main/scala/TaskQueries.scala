@@ -6,7 +6,7 @@ import Zap.Zap
 import scala.language.higherKinds
 import cats.free._
 
-sealed trait TaskQuery[+A]
+sealed trait TaskQuery[A]
 final case class FindTask[A](id: String, next: Option[Task] => A) extends TaskQuery[A]
 final case class FindAllTasks[A](next: List[Task] => A) extends TaskQuery[A]
 final case class FindCompletedTasks[A](next: List[Task] => A) extends TaskQuery[A]
@@ -22,7 +22,7 @@ class TaskQueries[F[_]](implicit I: TaskQuery :<: F) {
 object TaskQueries {
   implicit def instance[F[_]](implicit I: Inject[TaskQuery,F]): TaskQueries[F] = new TaskQueries[F]
 
-  implicit def taskQueryF[A]: Functor[TaskQuery] = new Functor[TaskQuery] {
+  implicit def taskQueryF: Functor[TaskQuery] = new Functor[TaskQuery] {
     override def map[A, B](fa: TaskQuery[A])(f: (A) => B): TaskQuery[B] = fa match {
       case FindTask(id, next) => FindTask(id, x => f(next(x)))
       case FindAllTasks(next) => FindAllTasks(x => f(next(x)))
@@ -33,7 +33,7 @@ object TaskQueries {
 }
 
 object CotaskQueries {
-  final case class CotaskQuery[+A](
+  final case class CotaskQuery[A](
     findTaskH: (String) => (Option[Task], A),
     findAllH: () => (List[Task], A),
     findOpenH: () => (List[Task], A),

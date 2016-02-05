@@ -57,5 +57,5 @@ object MapInterpreter {
   private def tasksAndList(filter: (Task) => Boolean)(ts: TasksMap)(): (List[Task], TasksMap) = (tasksAsList(ts, filter), ts)
 
   private def logMsg(tag: String)(ts: TasksMap)(msg: String): TasksMap =
-    (log modify ((l: List[String]) => l :+ s"[$tag] $msg"))(ts)
+    (log modify (_ :+ s"[$tag] $msg"))(ts)
 }

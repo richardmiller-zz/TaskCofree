@@ -5,7 +5,7 @@ import cats.free.{Free, Inject}
 import cofree.tasks.Zap.Zap
 import scala.language.higherKinds
 
-sealed trait TaskCommand[+A]
+sealed trait TaskCommand[A]
 final case class CommitToTask[A](id: String, text: String, next: A) extends TaskCommand[A]
 final case class CompleteTask[A](id: String, next: A) extends TaskCommand[A]
 
@@ -17,7 +17,7 @@ class TaskCommands[F[_]](implicit I: Inject[TaskCommand,F]) {
 object TaskCommands {
   implicit def instance[F[_]](implicit I: Inject[TaskCommand,F]): TaskCommands[F] = new TaskCommands[F]
 
-  implicit def taskCommandF[A]: Functor[TaskCommand] = new Functor[TaskCommand] {
+  implicit def taskCommandF: Functor[TaskCommand] = new Functor[TaskCommand] {
     override def map[A, B](fa: TaskCommand[A])(f: (A) => B): TaskCommand[B] = fa match {
       case CommitToTask(id, text, next) => CommitToTask(id, text, f(next))
       case CompleteTask(id, next) => CompleteTask(id, f(next))
@@ -26,7 +26,7 @@ object TaskCommands {
 }
 
 object CotaskCommands {
-  final case class CotaskCommand[+A](commitH: (String, String) => A, completeH: (String) => A)
+  final case class CotaskCommand[A](commitH: (String, String) => A, completeH: (String) => A)
 
   implicit def CoTaskCommandF: Functor[CotaskCommand] = new Functor[CotaskCommand] {
     override def map[A, B](fa: CotaskCommand[A])(f: (A) => B): CotaskCommand[B] =
